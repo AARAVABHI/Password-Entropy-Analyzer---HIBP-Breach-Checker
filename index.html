@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Password Entropy & Breach Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body
+    class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4 font-sans"
+  >
+    <div
+      class="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 md:p-8"
+    >
+      <h1 class="text-2xl font-bold text-emerald-400 mb-1">
+        Password Security Auditor
+      </h1>
+      <p class="text-sm text-slate-400 mb-6">
+        Shannon Entropy Calculator & HIBP k-Anonymity Breach Checker
+      </p>
+
+      <!-- Password Input -->
+      <div class="relative mb-6">
+        <input
+          id="passwordInput"
+          type="password"
+          placeholder="Type a password to analyze..."
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:border-emerald-500 pr-20"
+        />
+        <button
+          id="toggleBtn"
+          type="button"
+          class="absolute right-3 top-3 text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded text-slate-300"
+        >
+          Show
+        </button>
+      </div>
+
+      <!-- Strength Meter Bar -->
+      <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mb-6">
+        <div
+          id="strengthBar"
+          class="bg-red-500 h-full w-0 transition-all duration-300"
+        ></div>
+      </div>
+
+      <!-- Metrics Grid -->
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="bg-slate-800/60 border border-slate-800 p-4 rounded-xl">
+          <p class="text-xs text-slate-400 uppercase">Information Entropy</p>
+          <p id="entropyVal" class="text-2xl font-bold text-white mt-1">
+            0 bits
+          </p>
+          <p id="strengthLabel" class="text-xs text-slate-400 mt-1">
+            Waiting for input...
+          </p>
+        </div>
+        <div class="bg-slate-800/60 border border-slate-800 p-4 rounded-xl">
+          <p class="text-xs text-slate-400 uppercase">
+            Est. Crack Time (10B/s)
+          </p>
+          <p id="crackTimeVal" class="text-lg font-bold text-amber-400 mt-1">
+            Instantly
+          </p>
+          <p class="text-xs text-slate-500 mt-1">Offline RTX 4090 Rig</p>
+        </div>
+      </div>
+
+      <!-- HIBP Breach Check Section -->
+      <div
+        class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 flex items-center justify-between"
+      >
+        <div>
+          <p class="text-sm font-semibold text-slate-200">
+            Real-World Data Breach Check
+          </p>
+          <p id="breachStatus" class="text-xs text-slate-400 mt-0.5">
+            Uses k-Anonymity (only first 5 SHA-1 hex chars sent)
+          </p>
+        </div>
+        <button
+          id="checkBreachBtn"
+          class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+        >
+          Check Breach
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const passwordInput = document.getElementById("passwordInput");
+      const toggleBtn = document.getElementById("toggleBtn");
+      const strengthBar = document.getElementById("strengthBar");
+      const entropyVal = document.getElementById("entropyVal");
+      const strengthLabel = document.getElementById("strengthLabel");
+      const crackTimeVal = document.getElementById("crackTimeVal");
+      const checkBreachBtn = document.getElementById("checkBreachBtn");
+      const breachStatus = document.getElementById("breachStatus");
+
+      // Toggle Password Visibility
+      toggleBtn.addEventListener("click", () => {
+        const isPwd = passwordInput.type === "password";
+        passwordInput.type = isPwd ? "text" : "password";
+        toggleBtn.textContent = isPwd ? "Hide" : "Show";
+      });
+
+      // Real-time Entropy & Crack Time Calculation
+      passwordInput.addEventListener("input", () => {
+        const pwd = passwordInput.value;
+        breachStatus.textContent =
+          "Uses k-Anonymity (only first 5 SHA-1 hex chars sent)";
+        breachStatus.className = "text-xs text-slate-400 mt-0.5";
+
+        if (!pwd) {
+          entropyVal.textContent = "0 bits";
+          strengthLabel.textContent = "Waiting for input...";
+          crackTimeVal.textContent = "Instantly";
+          strengthBar.style.width = "0%";
+          return;
+        }
+
+        // 1. Determine Character Pool Size (R)
+        let pool = 0;
+        if (/[a-z]/.test(pwd)) pool += 26;
+        if (/[A-Z]/.test(pwd)) pool += 26;
+        if (/[0-9]/.test(pwd)) pool += 10;
+        if (/[^a-zA-Z0-9]/.test(pwd)) pool += 32;
+
+        // 2. Calculate Entropy: E = L * log2(R)
+        const entropy = pwd.length * Math.log2(pool);
+        entropyVal.textContent = `${entropy.toFixed(1)} bits`;
+
+        // 3. Update Visual Strength Meter
+        const pct = Math.min(100, (entropy / 100) * 100);
+        strengthBar.style.width = `${pct}%`;
+
+        if (entropy < 40) {
+          strengthBar.className =
+            "bg-red-500 h-full transition-all duration-300";
+          strengthLabel.textContent = "Weak (Vulnerable to brute-force)";
+        } else if (entropy < 70) {
+          strengthBar.className =
+            "bg-amber-500 h-full transition-all duration-300";
+          strengthLabel.textContent = "Moderate (Good for standard accounts)";
+        } else {
+          strengthBar.className =
+            "bg-emerald-500 h-full transition-all duration-300";
+          strengthLabel.textContent = "Strong (Cryptographically resilient)";
+        }
+
+        // 4. Calculate Time to Crack at 10 Billion guesses/sec
+        const seconds = Math.pow(2, entropy) / 2 / 10_000_000_000;
+        crackTimeVal.textContent = formatTime(seconds);
+      });
+
+      function formatTime(seconds) {
+        if (seconds < 1) return "Instantly (< 1 sec)";
+        if (seconds < 60) return `~${Math.round(seconds)} seconds`;
+        if (seconds < 3600) return `~${Math.round(seconds / 60)} minutes`;
+        if (seconds < 86400) return `~${Math.round(seconds / 3600)} hours`;
+        if (seconds < 31536000) return `~${Math.round(seconds / 86400)} days`;
+        const years = seconds / 31536000;
+        if (years > 1e6) return `${years.toExponential(1)} years`;
+        return `~${Math.round(years).toLocaleString()} years`;
+      }
+
+      // k-Anonymity Breach Check via Web Crypto API
+      checkBreachBtn.addEventListener("click", async () => {
+        const pwd = passwordInput.value;
+        if (!pwd) return;
+
+        breachStatus.textContent = "Checking HIBP database...";
+        breachStatus.className = "text-xs text-amber-400 mt-0.5";
+
+        try {
+          // Compute SHA-1 hash locally in browser
+          const msgBuffer = new TextEncoder().encode(pwd);
+          const hashBuffer = await crypto.subtle.digest("SHA-1", msgBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const sha1Hash = hashArray
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")
+            .toUpperCase();
+
+          const prefix = sha1Hash.slice(0, 5);
+          const suffix = sha1Hash.slice(5);
+
+          const res = await fetch(
+            `https://api.pwnedpasswords.com/range/${prefix}`,
+          );
+          const text = await res.text();
+
+          const match = text
+            .split("\n")
+            .find((line) => line.startsWith(suffix));
+          if (match) {
+            const count = parseInt(match.split(":")[1], 10);
+            breachStatus.textContent = `COMPROMISED: Exposed in ${count.toLocaleString()} data breaches!`;
+            breachStatus.className =
+              "text-xs text-red-400 font-semibold mt-0.5";
+          } else {
+            breachStatus.textContent =
+              "SAFE: Zero matches found in 600M+ breached passwords.";
+            breachStatus.className =
+              "text-xs text-emerald-400 font-semibold mt-0.5";
+          }
+        } catch (err) {
+          breachStatus.textContent = "Network error querying HIBP API.";
+          breachStatus.className = "text-xs text-red-400 mt-0.5";
+        }
+      });
+    </script>
+  </body>
+</html>
